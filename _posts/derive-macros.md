@@ -1,8 +1,8 @@
 ---
-title: Just What are Derive Macros
-date: 2023-09-27 9:30:00
+title: Just What are Derive Macros?
+date: 2023-09-27 9:30:00 -495
 categories: [rust]
-tags: [rust, macros]
+tags: [rust,macros]
 ---
 
 This procedural macro type is what allows for the `#[derive(Debug, Copy)]` syntax to implement the `Debug` and `Copy` traits on structs, enums, and unions

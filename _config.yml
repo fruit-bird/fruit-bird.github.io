@@ -20,7 +20,7 @@ timezone: Africa/Casablanca
 
 title: Bird Thoughts # the main title
 
-tagline: A Computer Science centric blog # it will display as the sub-title
+tagline: A Computer Science-centric blog # it will display as the sub-title
 
 description: >- # used by seo meta and the atom feed
   A Computer Science centric blog. I like to explain things I'm passionate about.
