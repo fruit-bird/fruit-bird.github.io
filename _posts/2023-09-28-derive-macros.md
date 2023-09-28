@@ -1,19 +1,24 @@
 ---
-title: Just What are Derive Macros?
-date: 2023-09-27 9:30:00 -495
-categories: [rust]
-tags: [rust,macros]
+title: Just How do Derive Macros Work?
+date: 2023-09-28 13:11:00 +0100
+pin: true
+categories: [Rust]
+tags: [rust, macros]
 ---
 
 This procedural macro type is what allows for the `#[derive(Debug, Copy)]` syntax to implement the `Debug` and `Copy` traits on structs, enums, and unions
 
-To make a derive macro, we need to create a function annotated with the `#[proc_macro_derive(Trait)]` ^[Only functions that have this attribute can be exported from the crate] attribute. This function is what will be called with we annotate a type with `#[derive(Trait)]`
+To make a derive macro, we need to create a function annotated with the `#[proc_macro_derive(Trait)]` [^proc-macro] attribute. This function is what will be called with we annotate a type with `#[derive(Trait)]`
+
+[^proc-macro]: Only functions that have this attribute can be exported from the crate
 
 ## Example: Deriving the `IntoMap` Trait
 We want to create a derive macro to simplify the implementation of the `IntoMap` trait. Our macro will only be valid when derived from a struct with named fields
 
 This trait has one member function `into_map`, that "serializes" the struct and maps it to a `BTreeMap`. We define it as follows:
 ```rust
+use std::collections::BTreeMap;
+
 pub trait IntoMap {
     fn into_map(&self) -> BTreeMap<String, String>;
 }
@@ -22,7 +27,9 @@ pub trait IntoMap {
 We start by declaring our function with the predefined derive signature: `TokenStream` as input, `TokenStream` as output
 ```rust
 #[proc_macro_derive(IntoMap)]
-pub fn into_map_derive(input: TokenStream) -> TokenStream {}
+pub fn into_map_derive(input: TokenStream) -> TokenStream {
+    todo!()
+}
 ```
 
 We then use `parse_macro_input!` from the [`syn` crate](https://crates.io/crates/syn) to parse the `input` into a `DeriveInput`, and extract the struct's name (identifier)
@@ -36,11 +43,11 @@ We perform (deeply) nested pattern matching to validate our logical choice to on
 
 ```rust
 match parsed_input.data {
-	Data::Struct(DataStruct {
-		fields: Fields::Named(FieldsNamed { ref named, .. }),
-		..
-	}) => todo!(),
-	_ => panic!("#[derive(IntoMap)] works in structs w/ named fields"),
+    Data::Struct(DataStruct {
+        fields: Fields::Named(FieldsNamed { ref named, .. }),
+        ..
+    }) => todo!(),
+    _ => panic!("#[derive(IntoMap)] works in structs w/ named fields"),
 };
 ```
 
@@ -48,17 +55,17 @@ match parsed_input.data {
 
 The variables `map` and `self` do not exist within the current context, which might seem like we are making a non-hygienic macro. That is not the case, as we are just creating a `TokenStream` for now. These tokens will be passed to a context which does have `map` and `self`
 
-We obtain our lazy iterator of type `impl Iterator<Item = TokenStream>`
+We obtain our lazy iterator of tokens `impl Iterator<Item = TokenStream>`
 
 ```rust
 let insert_tokens = named.iter().map(|field| {
-	let field_name = field.ident.clone().unwrap();
-	quote! {
-		map.insert(
-			stringify!(#field_name).to_string(),
-			self.#field_name.to_string()
-		);
-	}
+    let field_name = field.ident.clone().unwrap();
+    quote! {
+        map.insert(
+            stringify!(#field_name).to_string(),
+            self.#field_name.to_string()
+        );
+    }
 }
 ```
 
@@ -68,16 +75,16 @@ Inside `into_map`, we find ourselves in the previously mentioned context that ha
 
 ```rust
 let tokens = quote! {
-	use std::collections::BTreeMap;
-	use into_map::IntoMap;
+    use std::collections::BTreeMap;
+    use into_map::IntoMap;
 
-	impl IntoMap for #struct_name {
-		fn into_map(&self) -> BTreeMap<String, String> {
-			let mut map = BTreeMap::new();
-			#(#insert_tokens)*
-			map
-		}
-	}
+    impl IntoMap for #struct_name {
+        fn into_map(&self) -> BTreeMap<String, String> {
+            let mut map = BTreeMap::new();
+            #(#insert_tokens)*
+            map
+        }
+    }
 };
 ```
 
@@ -97,17 +104,17 @@ We do that by iterating over the attributes of each field, validating that `all`
 
 ```rust
 let insert_tokens = named.iter().filter_map(|field| {
-	let field_name = field.ident.clone().unwrap();
-	field
-		.attrs
-		.iter()
-		.all(|attr| !attr.path().is_ident(ATTR_IGNORE))
-		.then_some(quote! {
-			map.insert(
-				stringify!(#field_name).to_string(),
-				self.#field_name.to_string()
-			);
-		})
+    let field_name = field.ident.clone().unwrap();
+    field
+        .attrs
+        .iter()
+        .all(|attr| !attr.path().is_ident(ATTR_IGNORE))
+        .then_some(quote! {
+            map.insert(
+                stringify!(#field_name).to_string(),
+                self.#field_name.to_string()
+            );
+        })
 })
 ```
 
@@ -130,20 +137,20 @@ The way to do it is slightly more complex, but it only requires changing the pre
 
 ```rust
 field.attrs.iter().all(|attr| {
-	if attr.path().is_ident(ATTR_INTOMAP) {
-		match attr.parse_args::<Ident>() {
-			Ok(ident) => ident != IDENT_IGNORE,
-			Err(_) => true,
-		}
-	} else {
-		true
-	}
+    if attr.path().is_ident(ATTR_INTOMAP) {
+        match attr.parse_args::<Ident>() {
+            Ok(ident) => ident != IDENT_IGNORE,
+            Err(_) => true,
+        }
+    } else {
+        true
+    }
 })
 .then_some(quote! {
-	map.insert(
-		stringify!(#field_name).to_string(),
-		self.#field_name.to_string()
-	);
+    map.insert(
+        stringify!(#field_name).to_string(),
+        self.#field_name.to_string()
+    );
 })
 ```
 
@@ -156,10 +163,10 @@ All that we will need to change is the key name when inserting into the map
 ```rust
 let field_rename = todo!();
 quote! {
-	map.insert(
-		stringify!(#field_rename).to_string(),
-		self.#field_name.to_string()
-	);
+    map.insert(
+        stringify!(#field_rename).to_string(),
+        self.#field_name.to_string()
+    );
 })
 ```
 
@@ -173,13 +180,13 @@ We then iterate over the field's attributes, and use a `find_map` to return the 
 
 ```rust
 field.attrs.iter().find_map(|attr| {
-	if attr.path().is_ident(ATTR_INTOMAP) {
-		attr.parse_args::<ExprAssign>().ok().and_then(|expr| {
-			todo!()
-		})
-	} else {
-		None
-	}
+    if attr.path().is_ident(ATTR_INTOMAP) {
+        attr.parse_args::<ExprAssign>().ok().and_then(|expr| {
+            todo!()
+        })
+    } else {
+        None
+    }
 })
 ```
 
@@ -187,13 +194,13 @@ Finally, we match the left and right sides of the expression, validating that th
 
 ```rust
  match (*expr.left, *expr.right) {
-	(
-		Expr::Path(ExprPath { path, .. }),
-		Expr::Lit(ExprLit { lit: Lit::Str(s), .. }),
-	) if path.is_ident(IDENT_RENAME) => {
-		Some(Ident::new(s.value().as_str(), s.span()))
-	}
-	_ => None,
+    (
+        Expr::Path(ExprPath { path, .. }),
+        Expr::Lit(ExprLit { lit: Lit::Str(s), .. }),
+    ) if path.is_ident(IDENT_RENAME) => {
+        Some(Ident::new(s.value().as_str(), s.span()))
+    }
+    _ => None,
 }
 ```
 
