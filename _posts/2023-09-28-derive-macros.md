@@ -20,34 +20,59 @@ This trait has one member function `into_map`, that "serializes" the struct and 
 use std::collections::BTreeMap;
 
 pub trait IntoMap {
-    fn into_map(&self) -> BTreeMap<String, String>;
+    fn as_map(&self) -> BTreeMap<String, String>;
 }
 ```
 
 We start by declaring our function with the predefined derive signature: `TokenStream` as input, `TokenStream` as output
 ```rust
 #[proc_macro_derive(IntoMap)]
-pub fn into_map_derive(input: TokenStream) -> TokenStream {
+pub fn intomap_derive(input: TokenStream) -> TokenStream {
     todo!()
 }
 ```
 
-We then use `parse_macro_input!` from the [`syn` crate](https://crates.io/crates/syn) to parse the `input` into a `DeriveInput`, and extract the struct's name (identifier)
+> ## A Small Intermission
+> In order to leverage Rust's elegant error handling, and because of the fixed derive function signature, we typically export a macro's implementation to another function that returns a `syn::Result<TokenStream2>`, where `TokenStream2` is an aliased `proc_macro2::TokenStream`
+> 
+> ```rust
+> mod expand {
+>     pub fn intomap_impl(parsed_input: DeriveInput) -> Result<TokenStream2> {
+>         todo!()
+>     }
+> }
+> ```
+> We use `parse_macro_input!` from the [syn crate](https://crates.io/crates/syn) to parse the `input` into a `DeriveInput`, and extract the struct's name (identifier) 
+> 
+> We will then call this in the main derive function, and convert any `Err` into a compile error. The `.into()` is to convert from `TokenStream2` into `TokenStream`
+>
+> ```rust
+> #[proc_macro_derive(IntoMap)]
+> pub fn intomap_derive(input: TokenStream) -> TokenStream {
+>     let parsed_input = parse_macro_input!(input as DeriveInput);
+>     expand::intomap_impl(parsed_input)
+>         .unwrap_or_else(Error::into_compile_error)
+>         .into()
+> }
+> ```
+{: .prompt-tip }
+
+Now, back in `expand::intomap_impl`, We extract the struct's name, which we will need later. We then perform nested pattern matching to parse only structs with named fields. We invalidate everything else by returning an error
+
 
 ```rust
-let parsed_input = parse_macro_input!(input as DeriveInput);
 let struct_name = parsed_input.ident;
-```
-
-We perform (deeply) nested pattern matching to validate our logical choice to only parse structs with named fields. We invalidate everything else by panicking
-
-```rust
 match parsed_input.data {
     Data::Struct(DataStruct {
         fields: Fields::Named(FieldsNamed { ref named, .. }),
         ..
     }) => todo!(),
-    _ => panic!("#[derive(IntoMap)] works in structs w/ named fields"),
+    _ => {
+        return Err(Error::new(
+            Span::call_site(),
+            "#[derive(IntoMap)] is only valid for structs with named fields",
+        ))
+    }
 };
 ```
 
@@ -79,7 +104,7 @@ let tokens = quote! {
     use into_map::IntoMap;
 
     impl IntoMap for #struct_name {
-        fn into_map(&self) -> BTreeMap<String, String> {
+        fn as_map(&self) -> BTreeMap<String, String> {
             let mut map = BTreeMap::new();
             #(#insert_tokens)*
             map
@@ -95,7 +120,9 @@ We want to extend the capability of our macro by adding the option to ignore som
 const ATTR_IGNORE: &str = "intomap_ignore";
 
 #[proc_macro_derive(IntoMap, attributes(intomap_ignore))]
-pub fn into_map_derive(input: TokenStream) -> TokenStream {}
+pub fn intomap_derive(input: TokenStream) -> TokenStream {
+    todo!()
+}
 ```
 
 We then will modify how we obtain `insert_tokens` so that it skips the fields tagged with our new attribute. We will replace our `map` over the struct fields with a `filter_map`, and only return `Some(TokenStream)` if the field is not tagged with `#[intomap_ignore]`
@@ -128,7 +155,7 @@ const ATTR_INTOMAP: &str = "intomap";
 const IDENT_IGNORE: &str = "ignore";
 
 #[proc_macro_derive(IntoMap, attributes(intomap))]
-pub fn into_map_derive(input: TokenStream) -> TokenStream {}
+pub fn intomap_derive(input: TokenStream) -> TokenStream {}
 ```
 
 The way to do it is slightly more complex, but it only requires changing the predicate inside our `all` call. If the field's attribute is `intomap`[^path], we parse its arguments as an identifier, and match on the result such that `all` returns true only if all of the attribute arguments do not match `ignore`.
@@ -173,27 +200,29 @@ quote! {
 Now to parse our rename syntax. Let's export the functionality to a new function. Our derive function is starting to get long. We want to take a field as input, go through its attributes, and return `Ident(new_name)` if there is a rename attribute
 
 ```rust
-fn field_rename(field: &Field) -> Option<Ident> {}
+fn field_rename(field: &Field) -> Option<Ident> {
+    todo!()
+}
 ```
 
-We then iterate over the field's attributes, and use a `find_map` to return the first `Some` instance of the passed closure. Our closure consists of validating that the attribute's path [^path] is `intomap`, parsing its arguments as an assignment expression because our syntax is expression-like.  Any diverging path returns a `None`
+We then iterate over the field's attributes, filter out the attributes whose paths [^path] aren't `intomap`, and use a `find_map` to return the first instance of a renaming. We then parse its arguments as an assignment expression because our rename syntax is expression-like
 
 ```rust
-field.attrs.iter().find_map(|attr| {
-    if attr.path().is_ident(ATTR_INTOMAP) {
+field
+    .attrs
+    .iter()
+    .filter(|attr| attr.path().is_ident(ATTR_INTOMAP))
+    .find_map(|attr| {
         attr.parse_args::<ExprAssign>().ok().and_then(|expr| {
             todo!()
         })
-    } else {
-        None
-    }
-})
+    })
 ```
 
-Finally, we match the left and right sides of the expression, validating that the left side is `Ident(rename)`, and converting the string literal on the right side to an identifier.
+Finally, we match the left and right sides of the expression, validating that the left side is the `rename` identifier, and converting the string literal on the right side to an identifier.
 
 ```rust
- match (*expr.left, *expr.right) {
+match (*expr.left, *expr.right) {
     (
         Expr::Path(ExprPath { path, .. }),
         Expr::Lit(ExprLit { lit: Lit::Str(s), .. }),
@@ -209,3 +238,5 @@ Now to use this function, we call it, and default to the original field name in 
 ```rust
 let field_rename = field_rename(&field).unwrap_or(field_name.clone());
 ```
+
+We're done! Derive macros are one Rust's greatest features, and understanding them lifts the veil of complexity. No more magic, or rather, you are now a magician. All of the code is available in [this repo](https://github.com/fruit-bird/intomap)
