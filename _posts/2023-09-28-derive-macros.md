@@ -5,25 +5,29 @@ categories: [Rust]
 tags: [rust, macros]
 ---
 
-This procedural macro type is what allows for the `#[derive(Debug, Copy)]` syntax to implement the `Debug` and `Copy` traits on structs, enums, and unions
+A macro, as you probably heard before, is code that writes code. Procedural macros are one of two types of macros in Rust (the other being declarative macros). These macros give you complete control over how code is generated. They are procedural in the sense that you have to write how you want the code to be generated or transformed given a token tree input
 
-To make a derive macro, we need to create a function annotated with the `#[proc_macro_derive(Trait)]` [^proc-macro] attribute. This function is what will be called with we annotate a type with `#[derive(Trait)]`
+Whenever you annotate your struct or enum (or union??) with `#[derive(Debug)]`, the `Debug` proc macro responsible for implementing this trait is invoked to automatically create the `impl Debug for MyStruct { ... }`, directly accessing things code can't usually access, such as the name of the struct and its fields. Let's try to understand how they do this, by making our own macro. All of the code is available [here](https://github.com/fruit-bird/intomap)
 
-[^proc-macro]: Only functions that have this attribute can be exported from the crate
-
-## Example: Deriving the `IntoMap` Trait
+## Example: Deriving the IntoMap Trait
 We want to create a derive macro to simplify the implementation of the `IntoMap` trait. Our macro will only be valid when derived from a struct with named fields
 
-This trait has one member function `as_map`, that "serializes" the struct and maps it to a `BTreeMap`. We define it as follows:
+This trait has one member function `as_map`, that "serializes" the struct and maps its fields and values to a `BTreeMap`. We define it as follows:
 ```rust
-use std::collections::BTreeMap;
-
 pub trait IntoMap {
     fn as_map(&self) -> BTreeMap<String, String>;
 }
 ```
 
-We start by declaring our function with the predefined derive signature: `TokenStream` as input, `TokenStream` as output
+To make our derive macro, we first need to make a new crate, and specify that it's a procedual macro crate
+```toml
+[lib]
+proc-macro = true
+```
+
+In our lib file, we create a function with the `#[proc_macro_derive(Trait)]` attribute. This function is what will be called with we annotate a type with `#[derive(Trait)]`
+
+We start by declaring our function with the predefined signature of a derive macro: `TokenStream` as input, `TokenStream` as output, because it's taking in source code, and outputting new source code
 ```rust
 #[proc_macro_derive(IntoMap)]
 pub fn intomap_derive(input: TokenStream) -> TokenStream {
@@ -156,9 +160,10 @@ const IDENT_IGNORE: &str = "ignore";
 pub fn intomap_derive(input: TokenStream) -> TokenStream {}
 ```
 
-The way to do it is slightly more complex, but it only requires changing the predicate inside our `all` call. If the field's attribute is `intomap`[^path], we parse its arguments as an identifier, and match on the result such that `all` returns true only if all of the attribute arguments do not match `ignore`.
+The way to do it is slightly more complex, but it only requires changing the predicate inside our `all` call. If the field's attribute's path is `intomap`, we parse its arguments as an identifier, and match on the result such that `all` returns true only if all of the attribute arguments do not match `ignore`.
 
-[^path]: `.path()` returns the path that identifies the interpretation of an attribute, which is `test` in `#[test]`, `derive` in `#[derive(Copy)]`, and `path` in `#[path = "sys/windows.rs"]`
+> `.path()` returns the path that identifies the interpretation of an attribute, which is `test` in `#[test]`, `derive` in `#[derive(Copy)]`, and `path` in `#[path = "sys/windows.rs"]`
+{: .prompt-warn }
 
 ```rust
 field
@@ -201,7 +206,7 @@ fn field_rename(field: &Field) -> Option<Ident> {
 }
 ```
 
-We then iterate over the field's attributes, filter out the attributes whose paths [^path] aren't `intomap`, and use a `find_map` to return the first instance of a renaming. We then parse its arguments as an assignment expression because our rename syntax is expression-like
+We then iterate over the field's attributes, filter out the attributes whose paths  aren't `intomap`, and use a `find_map` to return the first instance of a renaming. We then parse its arguments as an assignment expression because our rename syntax is expression-like
 
 ```rust
 field
@@ -235,4 +240,6 @@ Now to use this function, we call it, and default to the original field name in 
 let field_rename = field_rename(&field).unwrap_or(field_name.clone());
 ```
 
-We're done! Derive macros are one Rust's greatest features, and understanding them lifts the veil of complexity. No more magic, or rather, you are now a magician. All of the code is available in [this repo](https://github.com/fruit-bird/intomap)
+We're done! Derive macros are one Rust's greatest features, and understanding them lifts the veil of complexity. No more magic, or rather, you are now a magician
+
+Once again, all of the code is available in [this repo](https://github.com/fruit-bird/intomap). If there is an issue or if you want to contribute, please write an issue [here](https://github.com/fruit-bird/intomap/issues/new)
