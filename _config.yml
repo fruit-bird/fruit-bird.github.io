@@ -18,7 +18,7 @@ timezone: Africa/Casablanca
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Bird Thoughts # the main title
+title: iate10kiwis # the main title
 
 tagline: A Computer Science-centric blog # it will display as the sub-title
 
@@ -26,7 +26,7 @@ description: >- # used by seo meta and the atom feed
   A Computer Science centric blog. I like to explain things I'm passionate about.
 
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
-url: ""
+url: "https://fruit-bird.github.io"
 
 github:
   username: fruit-bird # change to your github username
@@ -126,7 +126,6 @@ kramdown:
     block:
       line_numbers: true
       start_line: 1
-  tab_width: 2
 
 collections:
   tabs:
