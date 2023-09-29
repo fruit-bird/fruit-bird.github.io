@@ -1,7 +1,6 @@
 ---
 title: Just How do Derive Macros Work?
 date: 2023-09-28 13:11:00 +0100
-pin: true
 categories: [Rust]
 tags: [rust, macros]
 ---
@@ -15,7 +14,7 @@ To make a derive macro, we need to create a function annotated with the `#[proc_
 ## Example: Deriving the `IntoMap` Trait
 We want to create a derive macro to simplify the implementation of the `IntoMap` trait. Our macro will only be valid when derived from a struct with named fields
 
-This trait has one member function `into_map`, that "serializes" the struct and maps it to a `BTreeMap`. We define it as follows:
+This trait has one member function `as_map`, that "serializes" the struct and maps it to a `BTreeMap`. We define it as follows:
 ```rust
 use std::collections::BTreeMap;
 
@@ -95,12 +94,12 @@ let insert_tokens = named.iter().map(|field| {
 
 Finally, we create the `TokenStream` that our function will be returning. We first bring the necessary types into scope, then implement `IntoMap` for our struct, whose name (identifier) we extracted earlier
 
-Inside `into_map`, we find ourselves in the previously mentioned context that has both `map` and `self`. We then consume the iterator to add our tokens that perform the insertions using a syntax similar to that of declarative macro repetitions, courtesy of `quote!`
+Inside `intomap`, we find ourselves in the previously mentioned context that has both `map` and `self`. We then consume the iterator to add our tokens that perform the insertions using a syntax similar to that of declarative macro repetitions, courtesy of `quote!`
 
 ```rust
 let tokens = quote! {
     use std::collections::BTreeMap;
-    use into_map::IntoMap;
+    use intomap::IntoMap;
 
     impl IntoMap for #struct_name {
         fn as_map(&self) -> BTreeMap<String, String> {
