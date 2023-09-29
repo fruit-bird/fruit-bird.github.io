@@ -32,7 +32,6 @@ pub fn intomap_derive(input: TokenStream) -> TokenStream {
 }
 ```
 
-> ## A Small Intermission
 > In order to leverage Rust's elegant error handling, and because of the fixed derive function signature, we typically export a macro's implementation to another function that returns a `syn::Result<TokenStream2>`, where `TokenStream2` is an aliased `proc_macro2::TokenStream`
 > 
 > ```rust
