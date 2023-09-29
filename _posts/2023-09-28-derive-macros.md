@@ -160,25 +160,23 @@ pub fn intomap_derive(input: TokenStream) -> TokenStream {}
 
 The way to do it is slightly more complex, but it only requires changing the predicate inside our `all` call. If the field's attribute is `intomap`[^path], we parse its arguments as an identifier, and match on the result such that `all` returns true only if all of the attribute arguments do not match `ignore`.
 
- [^path]: `.path()` returns the path that identifies the interpretation of an attribute, which is `test` in `#[test]`, `derive` in `#[derive(Copy)]`, and `path` in `#[path = "sys/windows.rs"]`
+[^path]: `.path()` returns the path that identifies the interpretation of an attribute, which is `test` in `#[test]`, `derive` in `#[derive(Copy)]`, and `path` in `#[path = "sys/windows.rs"]`
 
 ```rust
-field.attrs.iter().all(|attr| {
-    if attr.path().is_ident(ATTR_INTOMAP) {
-        match attr.parse_args::<Ident>() {
-            Ok(ident) => ident != IDENT_IGNORE,
-            Err(_) => true,
-        }
-    } else {
-        true
-    }
-})
-.then_some(quote! {
-    map.insert(
-        stringify!(#field_name).to_string(),
-        self.#field_name.to_string()
-    );
-})
+field
+    .attrs
+    .iter()
+    .filter(|attr| attr.path().is_ident(ATTR_INTOMAP))
+    .all(|attr| match attr.parse_args::<Ident>() {
+        Ok(ident) => ident != IDENT_IGNORE,
+        Err(_) => true,
+    })
+    .then_some(quote! {
+        map.insert(
+            stringify!(#field_name).to_string(),
+            self.#field_name.to_string()
+        );
+    })
 ```
 
 This way, we have a prettier attribute that allows for later consistency with our library. We can even add later attributes that will make more sense with this structure like `#[intomap(rename = "new_name")]`. Let's do that next
